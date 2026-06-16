@@ -459,6 +459,25 @@ namespace MainCore.Services
             return Result.Ok();
         }
 
+        public async Task<Result> Wait(Predicate<IWebDriver> condition, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (_driver is null) return Stop.DriverNotReady;
+            var wait = new WebDriverWait(_driver, timeout);
+            try
+            {
+                await Task.Run(() => wait.Until(driver => condition(driver), cancellationToken), cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return Cancel.Error;
+            }
+            catch (WebDriverTimeoutException ex)
+            {
+                return Retry.Error.WithError(ex.Message);
+            }
+            return Result.Ok();
+        }
+
         public async Task<Result> Wait(Predicate<IWebDriver> condition, CancellationToken cancellationToken, [CallerArgumentExpression("condition")] string? expression = null)
         {
             void wait()

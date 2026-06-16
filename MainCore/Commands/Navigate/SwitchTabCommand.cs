@@ -41,6 +41,21 @@
                 return true;
             }
 
+            // Verify quickly; if the tab click did not activate, self-heal by navigating its href.
+            var quick = await browser.Wait(tabActived, TimeSpan.FromSeconds(10), cancellationToken);
+            if (quick.IsFailed)
+            {
+                var href = tab.GetAttributeValue("href", "");
+                if (!string.IsNullOrEmpty(href))
+                {
+                    href = System.Net.WebUtility.HtmlDecode(href);
+                    var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+                    var url = href.StartsWith("http") ? href : $"{host}/{href.TrimStart('/')}";
+                    result = await browser.Navigate(url, cancellationToken);
+                    if (result.IsFailed) return result;
+                }
+            }
+
             result = await browser.Wait(tabActived, cancellationToken);
             if (result.IsFailed) return result;
 
