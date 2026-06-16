@@ -67,6 +67,15 @@ namespace MainCore.Commands.Navigate
                 }
             }
 
+            // Verify quickly; if the click did not open the build page, self-heal with a direct URL.
+            var quick = await browser.WaitUrl("build", TimeSpan.FromSeconds(10), cancellationToken);
+            if (quick.IsFailed)
+            {
+                var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+                result = await browser.Navigate($"{host}/build.php?id={location}", cancellationToken);
+                if (result.IsFailed) return result;
+            }
+
             result = await browser.WaitPageChanged("build", cancellationToken);
             if (result.IsFailed) return result;
 
