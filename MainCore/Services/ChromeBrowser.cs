@@ -359,20 +359,30 @@ namespace MainCore.Services
 
             void click()
             {
-                // Click a slightly-off-center point with a small cursor move + jittered pause so the
-                // pointer trace looks human, not pixel-perfect. Jitter is kept within the central third
-                // of the element (offset is measured from its center) so small nav buttons never miss.
-                var size = element.Size;
-                var jitterX = Math.Min((size.Width / 2) - 1, size.Width / 6);
-                var jitterY = Math.Min((size.Height / 2) - 1, size.Height / 6);
-                var offsetX = jitterX > 0 ? Random.Shared.Next(-jitterX, jitterX + 1) : 0;
-                var offsetY = jitterY > 0 ? Random.Shared.Next(-jitterY, jitterY + 1) : 0;
+                // Move the cursor to a slightly-off-center point with a jittered pause so the pointer
+                // trace looks human, not pixel-perfect. Then trigger the click with a native element
+                // click - in attach mode an Actions click sometimes does not land (causing 180s
+                // "villageChanged / TabActived / dorf" wait timeouts), while element.Click() reliably
+                // fires the navigation/handler.
+                try
+                {
+                    var size = element.Size;
+                    var jitterX = Math.Min((size.Width / 2) - 1, size.Width / 6);
+                    var jitterY = Math.Min((size.Height / 2) - 1, size.Height / 6);
+                    var offsetX = jitterX > 0 ? Random.Shared.Next(-jitterX, jitterX + 1) : 0;
+                    var offsetY = jitterY > 0 ? Random.Shared.Next(-jitterY, jitterY + 1) : 0;
 
-                new Actions(Driver)
-                    .MoveToElement(element, offsetX, offsetY)
-                    .Pause(TimeSpan.FromMilliseconds(Random.Shared.Next(40, 140)))
-                    .Click()
-                    .Perform();
+                    new Actions(Driver)
+                        .MoveToElement(element, offsetX, offsetY)
+                        .Pause(TimeSpan.FromMilliseconds(Random.Shared.Next(40, 140)))
+                        .Perform();
+                }
+                catch
+                {
+                    // Cursor move is cosmetic; ignore failures and still click.
+                }
+
+                element.Click();
             }
 
             await Task.Run(click, cancellationToken);
