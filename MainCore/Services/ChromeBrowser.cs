@@ -5,6 +5,8 @@ using OpenQA.Selenium.BiDi.WebExtension;
 using OpenQA.Selenium.Chrome;
 using OpenQA.Selenium.Interactions;
 using OpenQA.Selenium.Support.UI;
+using System.Diagnostics;
+using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 
 namespace MainCore.Services
@@ -33,6 +35,23 @@ namespace MainCore.Services
 
         public async Task Setup(ChromeSetting setting)
         {
+            var pathUserData = Path.Combine(AppContext.BaseDirectory, "Data", "Cache", setting.ProfilePath);
+            if (!Directory.Exists(pathUserData)) Directory.CreateDirectory(pathUserData);
+            pathUserData = Path.Combine(pathUserData, string.IsNullOrEmpty(setting.ProxyHost) ? "default" : setting.ProxyHost);
+
+            if (setting.AttachChrome)
+            {
+                await SetupAttached(setting, pathUserData);
+            }
+            else
+            {
+                await SetupSpawned(setting, pathUserData);
+            }
+        }
+
+        // Original flow: ChromeDriver spawns Chrome over a debugging pipe and drives it via BiDi.
+        private async Task SetupSpawned(ChromeSetting setting, string pathUserData)
+        {
             var options = new ChromeOptions();
 
             if (!string.IsNullOrEmpty(setting.ProxyHost))
@@ -40,13 +59,105 @@ namespace MainCore.Services
                 options.AddArgument($"--proxy-server={setting.ProxyHost}:{setting.ProxyPort}");
             }
 
+            ApplyCommonArguments(options, setting);
+
+            options.AddArgument("--enable-unsafe-extension-debugging");
+            options.AddArgument("--remote-debugging-pipe");
+
+            options.AddArguments($"user-data-dir={pathUserData}");
+            options.UseWebSocketUrl = true;
+            options.UnhandledPromptBehavior = UnhandledPromptBehavior.Ignore;
+
+            _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
+
+            _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
+            _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3)); // watch ads
+
+            _bidi = await _driver.AsBiDiAsync();
+            _context = (await _bidi.BrowsingContext.GetTreeAsync()).Contexts[0].Context;
+
+            foreach (var path in _extensionsPath)
+            {
+                await _bidi.WebExtension.InstallAsync(new ExtensionPath(path));
+                Logger.Information("- Installed extension: {path}", Path.GetFileNameWithoutExtension(path));
+            }
+
+            if (!string.IsNullOrEmpty(setting.ProxyHost) && !string.IsNullOrEmpty(setting.ProxyUsername) && !string.IsNullOrEmpty(setting.ProxyPassword))
+            {
+                _authIntercept = await _bidi.Network.InterceptAuthAsync(async auth =>
+                {
+                    Logger.Information("- Providing proxy auth credentials", auth.Request.Url);
+                    await auth.ContinueAsync(new AuthCredentials(setting.ProxyUsername, setting.ProxyPassword), new ContinueWithAuthCredentialsOptions());
+                });
+            }
+        }
+
+        // Real-profile flow (mirrors the Python sniper): launch a normal chrome.exe with a persistent
+        // user-data-dir + remote-debugging-port, then attach to it via DebuggerAddress. A Google/Gmail
+        // login done once in that profile persists across runs, and Chrome is a genuine user session.
+        private async Task SetupAttached(ChromeSetting setting, string pathUserData)
+        {
+            var port = setting.DebugPort > 0 ? setting.DebugPort : GetFreePort();
+
+            if (!IsPortOpen(port))
+            {
+                var chromeExe = FindChromeExecutable();
+                if (chromeExe is null) throw new FileNotFoundException("chrome.exe not found. Install Google Chrome to use attach mode.");
+
+                var args = new List<string>
+                {
+                    $"--remote-debugging-port={port}",
+                    $"--user-data-dir={pathUserData}",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                };
+                if (!string.IsNullOrEmpty(setting.UserAgent)) args.Add($"--user-agent={setting.UserAgent}");
+                if (!string.IsNullOrEmpty(setting.ProxyHost)) args.Add($"--proxy-server={setting.ProxyHost}:{setting.ProxyPort}");
+                if (setting.IsHeadless) { args.Add("--headless=new"); args.Add("--disable-dev-shm-usage"); }
+
+                Logger.Information("- Launching Chrome on debugging port {port} (profile: {profile})", port, pathUserData);
+                var psi = new ProcessStartInfo(chromeExe) { UseShellExecute = false };
+                foreach (var a in args) psi.ArgumentList.Add(a);
+                Process.Start(psi);
+
+                if (!await WaitForPort(port, TimeSpan.FromSeconds(40)))
+                    throw new TimeoutException($"Chrome did not open debugging port {port} within 40s.");
+            }
+            else
+            {
+                Logger.Information("- Attaching to existing Chrome on debugging port {port}", port);
+            }
+
+            var options = new ChromeOptions
+            {
+                DebuggerAddress = $"127.0.0.1:{port}",
+                UnhandledPromptBehavior = UnhandledPromptBehavior.Ignore,
+            };
+
+            _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
+            _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
+            _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3));
+
+            // BiDi over an attached session is best-effort; Navigate/Refresh fall back to classic WebDriver.
+            try
+            {
+                _bidi = await _driver.AsBiDiAsync();
+                _context = (await _bidi.BrowsingContext.GetTreeAsync()).Contexts[0].Context;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning("- BiDi unavailable in attach mode ({msg}); using WebDriver navigation.", ex.Message);
+                _bidi = null;
+                _context = null;
+            }
+        }
+
+        private static void ApplyCommonArguments(ChromeOptions options, ChromeSetting setting)
+        {
             options.AddArgument($"--user-agent={setting.UserAgent}");
             options.AddArgument("--ignore-certificate-errors");
             options.AddArguments("--no-default-browser-check", "--no-first-run", "--ash-no-nudges");
             options.AddArguments("--mute-audio", "--disable-gpu", "--disable-search-engine-choice-screen");
-
-            options.AddArgument("--enable-unsafe-extension-debugging");
-            options.AddArgument("--remote-debugging-pipe");
 
             options.AddExcludedArgument("enable-automation");
             options.AddAdditionalOption("useAutomationExtension", "undefined");
@@ -66,37 +177,55 @@ namespace MainCore.Services
             {
                 options.AddArgument("--start-maximized");
             }
-            var pathUserData = Path.Combine(AppContext.BaseDirectory, "Data", "Cache", setting.ProfilePath);
-            if (!Directory.Exists(pathUserData)) Directory.CreateDirectory(pathUserData);
+        }
 
-            pathUserData = Path.Combine(pathUserData, string.IsNullOrEmpty(setting.ProxyHost) ? "default" : setting.ProxyHost);
-
-            options.AddArguments($"user-data-dir={pathUserData}");
-            options.UseWebSocketUrl = true;
-            options.UnhandledPromptBehavior = UnhandledPromptBehavior.Ignore;
-
-            _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
-
-            _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
-            _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3)); // watch ads
-
-            _bidi = await _driver.AsBiDiAsync();
-            _context = (await _bidi.BrowsingContext.GetTreeAsync()).Contexts[0].Context;
-
-            foreach (var path in _extensionsPath)
+        private static string? FindChromeExecutable()
+        {
+            var candidates = new[]
             {
-                var result = await _bidi.WebExtension.InstallAsync(new ExtensionPath(path));
-                Logger.Information("- Installed extension: {path}", Path.GetFileNameWithoutExtension(path));
-            }
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                Environment.ExpandEnvironmentVariables(@"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                Environment.ExpandEnvironmentVariables(@"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+                "/usr/bin/google-chrome",
+                "/usr/bin/chromium-browser",
+            };
+            return candidates.FirstOrDefault(File.Exists);
+        }
 
-            if (!string.IsNullOrEmpty(setting.ProxyHost) && !string.IsNullOrEmpty(setting.ProxyUsername) && !string.IsNullOrEmpty(setting.ProxyPassword))
+        private static int GetFreePort()
+        {
+            var listener = new TcpListener(System.Net.IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
+        private static bool IsPortOpen(int port)
+        {
+            try
             {
-                _authIntercept = await _bidi.Network.InterceptAuthAsync(async auth =>
-                {
-                    Logger.Information("- Providing proxy auth credentials", auth.Request.Url);
-                    await auth.ContinueAsync(new AuthCredentials(setting.ProxyUsername, setting.ProxyPassword), new ContinueWithAuthCredentialsOptions());
-                });
+                using var client = new TcpClient();
+                var result = client.BeginConnect("127.0.0.1", port, null, null);
+                var ok = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(500));
+                if (ok) client.EndConnect(result);
+                return ok && client.Connected;
             }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static async Task<bool> WaitForPort(int port, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (IsPortOpen(port)) return true;
+                await Task.Delay(1000);
+            }
+            return false;
         }
 
         public ChromeDriver? Driver => _driver;
@@ -132,15 +261,25 @@ namespace MainCore.Services
 
         public async Task<Result> Refresh(CancellationToken cancellationToken)
         {
-            if (_context is null) return Stop.DriverNotReady;
-            await _context.ReloadAsync(new() { Wait = ReadinessState.Complete });
+            if (_context is not null)
+            {
+                await _context.ReloadAsync(new() { Wait = ReadinessState.Complete });
+                return Result.Ok();
+            }
+            if (_driver is null) return Stop.DriverNotReady;
+            await Task.Run(() => _driver.Navigate().Refresh(), cancellationToken);
             return Result.Ok();
         }
 
         public async Task<Result> Navigate(string url, CancellationToken cancellationToken)
         {
-            if (_context is null) return Stop.DriverNotReady;
-            await _context.NavigateAsync(url, new() { Wait = ReadinessState.Complete });
+            if (_context is not null)
+            {
+                await _context.NavigateAsync(url, new() { Wait = ReadinessState.Complete });
+                return Result.Ok();
+            }
+            if (_driver is null) return Stop.DriverNotReady;
+            await Task.Run(() => _driver.Navigate().GoToUrl(url), cancellationToken);
             return Result.Ok();
         }
 

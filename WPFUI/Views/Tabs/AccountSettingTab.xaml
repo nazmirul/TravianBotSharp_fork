@@ -63,6 +63,11 @@
                     <StackPanel>
                         <TextBlock HorizontalAlignment="Left" TextWrapping="Wrap" Text="Chrome settings" VerticalAlignment="Center" FontWeight="Bold" />
                         <CheckBox x:Name="HeadlessChrome" Content="Use headless chrome" />
+                        <CheckBox x:Name="AttachChrome" Content="Use real Chrome profile (launch chrome.exe + attach via debug port)" ToolTip="Launches a normal Chrome with a persistent profile and attaches over a debugging port. A Google/Gmail login done once in that profile persists across runs." />
+                        <StackPanel Orientation="Horizontal" Margin="0,4,0,0">
+                            <TextBlock Text="Debug port (0 = auto)" VerticalAlignment="Center" Margin="0,0,8,0" />
+                            <TextBox x:Name="ChromeDebugPort" Width="80" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
             </StackPanel>

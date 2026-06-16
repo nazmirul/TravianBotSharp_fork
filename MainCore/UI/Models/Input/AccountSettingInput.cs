@@ -14,6 +14,8 @@ namespace MainCore.UI.Models.Input
             SleepTime.Set(settings.GetValueOrDefault(AccountSettingEnums.SleepTimeMin), settings.GetValueOrDefault(AccountSettingEnums.SleepTimeMax));
             EnableAutoLoadVillage = settings.GetValueOrDefault(AccountSettingEnums.EnableAutoLoadVillageBuilding) == 1;
             HeadlessChrome = settings.GetValueOrDefault(AccountSettingEnums.HeadlessChrome) == 1;
+            AttachChrome = settings.GetValueOrDefault(AccountSettingEnums.AttachChrome) == 1;
+            ChromeDebugPort = settings.GetValueOrDefault(AccountSettingEnums.ChromeDebugPort);
             EnableAutoStartAdventure = settings.GetValueOrDefault(AccountSettingEnums.EnableAutoStartAdventure) == 1;
             FarmInterval.Set(settings.GetValueOrDefault(AccountSettingEnums.FarmIntervalMin), settings.GetValueOrDefault(AccountSettingEnums.FarmIntervalMax));
             UseStartAllButton = settings.GetValueOrDefault(AccountSettingEnums.UseStartAllButton) == 1;
@@ -28,6 +30,7 @@ namespace MainCore.UI.Models.Input
             var (workTimeMin, workTimeMax) = WorkTime.Get();
             var (sleepTimeMin, sleepTimeMax) = SleepTime.Get();
             var headlessChrome = HeadlessChrome ? 1 : 0;
+            var attachChrome = AttachChrome ? 1 : 0;
             var autoStartAdventure = EnableAutoStartAdventure ? 1 : 0;
 
             var (farmIntervalMin, farmIntervalMax) = FarmInterval.Get();
@@ -52,6 +55,8 @@ namespace MainCore.UI.Models.Input
                 { AccountSettingEnums.SleepTimeMin, sleepTimeMin },
 
                 { AccountSettingEnums.HeadlessChrome, headlessChrome },
+                { AccountSettingEnums.AttachChrome, attachChrome },
+                { AccountSettingEnums.ChromeDebugPort, ChromeDebugPort },
                 { AccountSettingEnums.EnableAutoStartAdventure, autoStartAdventure },
             };
             return settings;
@@ -70,6 +75,12 @@ namespace MainCore.UI.Models.Input
 
         [Reactive]
         private bool _headlessChrome;
+
+        [Reactive]
+        private bool _attachChrome;
+
+        [Reactive]
+        private int _chromeDebugPort;
 
         [Reactive]
         private bool _enableAutoStartAdventure;

@@ -28,6 +28,8 @@
             var accountFolderName = account.Username;
 
             var headlessChrome = context.BooleanByName(accountId, AccountSettingEnums.HeadlessChrome);
+            var attachChrome = context.BooleanByName(accountId, AccountSettingEnums.AttachChrome);
+            var debugPort = context.ByName(accountId, AccountSettingEnums.ChromeDebugPort);
             var profilePath = Path.Combine(serverFolderName, accountFolderName);
 
             var chromeSetting = new ChromeSetting()
@@ -39,6 +41,8 @@
                 ProxyUsername = access.ProxyUsername,
                 ProxyPassword = access.ProxyPassword,
                 IsHeadless = headlessChrome,
+                AttachChrome = attachChrome,
+                DebugPort = debugPort,
             };
 
             await browser.Setup(chromeSetting);

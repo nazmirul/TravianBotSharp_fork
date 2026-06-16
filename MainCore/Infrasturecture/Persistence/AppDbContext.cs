@@ -47,6 +47,8 @@ namespace MainCore.Infrasturecture.Persistence
             {AccountSettingEnums.WorkTimeMax, 720 },
             {AccountSettingEnums.HeadlessChrome, 0 },
             {AccountSettingEnums.EnableAutoStartAdventure, 0 },
+            {AccountSettingEnums.AttachChrome, 0 },
+            {AccountSettingEnums.ChromeDebugPort, 0 },
         }.ToImmutableDictionary();
 
         private List<AccountSettingEnums> GetMissingAccountSettings()
