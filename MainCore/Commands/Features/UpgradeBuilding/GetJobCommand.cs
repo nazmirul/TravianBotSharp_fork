@@ -16,10 +16,19 @@ namespace MainCore.Commands.Misc
 
             var (accountId, villageId) = command;
 
-            var buildJobs = context.GetBuildJobs(villageId);
-            if (buildJobs.Count == 0) return UpgradeBuildingError.BuildingJobQueueEmpty;
-
             var (buildings, queueBuildings) = context.GetBuildings(villageId);
+
+            var buildJobs = context.GetBuildJobs(villageId);
+            if (buildJobs.Count == 0)
+            {
+                // Never-idle fallback: keep upgrading the lowest resource field when the village opts in.
+                if (context.BooleanByName(villageId, VillageSettingEnums.AutoBuildResourceWhenIdle)
+                    && buildings.Any(x => ResourceTypes.Contains(x.Type) && x.Level < 20))
+                {
+                    return IdleResourceJob();
+                }
+                return UpgradeBuildingError.BuildingJobQueueEmpty;
+            }
 
             if (queueBuildings.Count == 0)
             {
@@ -77,6 +86,15 @@ namespace MainCore.Commands.Misc
 
             return UpgradeBuildingError.BuildingJobQueueBroken;
         }
+
+        // Synthetic (non-persisted) job: the ResourceBuild branch in GetBuildPlanCommand converts it to the
+        // lowest resource field +1 each time, so the queue stays "busy" without storing a real job.
+        private static JobDto IdleResourceJob()
+            => new()
+            {
+                Type = JobTypeEnums.ResourceBuild,
+                Content = JsonSerializer.Serialize(new ResourceBuildPlan { Plan = ResourcePlanEnums.AllResources, Level = 20 }),
+            };
 
         private static (List<Building>, List<QueueBuilding>) GetBuildings(this AppDbContext context, VillageId villageId)
         {

@@ -7,6 +7,7 @@
 
         ApplyRomanQueueLogicWhenBuilding,
         UseSpecialUpgrade,
+        AutoBuildResourceWhenIdle,
 
         // Complete now
         CompleteImmediately,

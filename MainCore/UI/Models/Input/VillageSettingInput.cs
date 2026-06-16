@@ -15,6 +15,9 @@ namespace MainCore.UI.Models.Input
         private bool _useSpecialUpgrade;
 
         [Reactive]
+        private bool _autoBuildResourceWhenIdle;
+
+        [Reactive]
         private bool _completeImmediately;
 
         public TribeSelectorViewModel Tribe { get; } = new();
@@ -67,6 +70,7 @@ namespace MainCore.UI.Models.Input
             ApplyRomanQueueLogicWhenBuilding = settings.GetValueOrDefault(VillageSettingEnums.ApplyRomanQueueLogicWhenBuilding) == 1;
             CompleteImmediately = settings.GetValueOrDefault(VillageSettingEnums.CompleteImmediately) == 1;
             UseSpecialUpgrade = settings.GetValueOrDefault(VillageSettingEnums.UseSpecialUpgrade) == 1;
+            AutoBuildResourceWhenIdle = settings.GetValueOrDefault(VillageSettingEnums.AutoBuildResourceWhenIdle) == 1;
 
             TrainTroopEnable = settings.GetValueOrDefault(VillageSettingEnums.TrainTroopEnable) == 1;
             TrainWhenLowResource = settings.GetValueOrDefault(VillageSettingEnums.TrainWhenLowResource) == 1;
@@ -122,6 +126,7 @@ namespace MainCore.UI.Models.Input
             var useHeroResourceForBuilding = UseHeroResourceForBuilding ? 1 : 0;
             var applyRomanQueueLogicWhenBuilding = ApplyRomanQueueLogicWhenBuilding ? 1 : 0;
             var useSpecialUpgrade = UseSpecialUpgrade ? 1 : 0;
+            var autoBuildResourceWhenIdle = AutoBuildResourceWhenIdle ? 1 : 0;
             var completeImmediately = CompleteImmediately ? 1 : 0;
 
             var tribe = (int)Tribe.Get();
@@ -156,6 +161,7 @@ namespace MainCore.UI.Models.Input
                 { VillageSettingEnums.UseHeroResourceForBuilding, useHeroResourceForBuilding },
                 { VillageSettingEnums.ApplyRomanQueueLogicWhenBuilding, applyRomanQueueLogicWhenBuilding },
                 { VillageSettingEnums.UseSpecialUpgrade, useSpecialUpgrade },
+                { VillageSettingEnums.AutoBuildResourceWhenIdle, autoBuildResourceWhenIdle },
                 { VillageSettingEnums.CompleteImmediately, completeImmediately },
                 { VillageSettingEnums.Tribe, tribe },
                 { VillageSettingEnums.TrainTroopEnable, trainTroopEnable },

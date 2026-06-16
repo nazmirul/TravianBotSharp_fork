@@ -44,6 +44,7 @@
                         </StackPanel>
 
                         <CheckBox x:Name="UseSpecialUpgrade" Content="Use special upgrade method (the right upgrade button)" />
+                        <CheckBox x:Name="AutoBuildResourceWhenIdle" Content="Auto-upgrade lowest resource field when build queue is empty" />
                     </StackPanel>
                 </Border>
                 <Border Style="{DynamicResource Box}">

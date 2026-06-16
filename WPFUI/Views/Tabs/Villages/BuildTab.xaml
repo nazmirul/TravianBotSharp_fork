@@ -101,15 +101,25 @@
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
-            <Grid Grid.Row="0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
+            <StackPanel Grid.Row="0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox x:Name="PresetSelector" Grid.Column="0" Margin="5" VerticalAlignment="Center" />
+                    <Button x:Name="PresetButton" Grid.Column="1" Content="Apply preset" Margin="5" />
+                </Grid>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
 
-                <Button x:Name="ImportButton"       Grid.Column="0" Content="Import" Margin="5" />
-                <Button x:Name="ExportButton"       Grid.Column="1" Content="Export" Margin="5" />
-            </Grid>
+                    <Button x:Name="ImportButton"       Grid.Column="0" Content="Import" Margin="5" />
+                    <Button x:Name="ExportButton"       Grid.Column="1" Content="Export" Margin="5" />
+                </Grid>
+            </StackPanel>
             <Border Grid.Row="1" Style="{DynamicResource Box}">
                 <ListBox x:Name="JobsGrid" SelectionMode="Single" ItemTemplate="{DynamicResource ListBoxColorItem}">
                     <ListBox.ContextMenu>

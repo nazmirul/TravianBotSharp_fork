@@ -1,5 +1,6 @@
 ﻿using Humanizer;
 using MainCore.Commands.UI.Villages.BuildViewModel;
+using MainCore.Models.Presets;
 using MainCore.UI.Models.Input;
 using MainCore.UI.Models.Output;
 using MainCore.UI.ViewModels.Abstract;
@@ -25,6 +26,11 @@ namespace MainCore.UI.ViewModels.Tabs.Villages
         public ListBoxItemViewModel Buildings { get; } = new();
         public ListBoxItemViewModel Queue { get; } = new();
         public ListBoxItemViewModel Jobs { get; } = new();
+
+        public List<BuildPreset> Presets { get; } = BuildPresets.All.ToList();
+
+        [Reactive]
+        private BuildPreset? _selectedPreset;
 
         public BuildViewModel(IDialogService dialogService, IValidator<NormalBuildInput> normalBuildInputValidator, IValidator<ResourceBuildInput> resourceBuildInputValidator, ICustomServiceScopeFactory serviceScopeFactory, ITaskManager taskManager, IRxQueue rxQueue)
         {
@@ -312,6 +318,30 @@ namespace MainCore.UI.ViewModels.Tabs.Villages
             using var scope = _serviceScopeFactory.CreateScope(AccountId);
             var resourceBuildCommand = scope.ServiceProvider.GetRequiredService<ResourceBuildCommand.Handler>();
             await resourceBuildCommand.HandleAsync(new(VillageId, ResourceBuildInput.ToPlan()));
+            await JobsModifiedCommand.Execute(new JobsModified(VillageId));
+        }
+
+        [ReactiveCommand]
+        private async Task Preset()
+        {
+            if (!IsAccountPaused(AccountId))
+            {
+                await _dialogService.MessageBox.Handle(new MessageBoxData("Warning", "Please pause account before modifing building queue"));
+                return;
+            }
+
+            if (SelectedPreset is null)
+            {
+                await _dialogService.MessageBox.Handle(new MessageBoxData("Warning", "Please select a preset"));
+                return;
+            }
+
+            var confirm = await _dialogService.ConfirmBox.Handle(new MessageBoxData("Warning", $"Append preset '{SelectedPreset.Name}' (with auto prerequisites) to the build queue?"));
+            if (!confirm) return;
+
+            using var scope = _serviceScopeFactory.CreateScope(AccountId);
+            var applyPresetCommand = scope.ServiceProvider.GetRequiredService<ApplyPresetCommand.Handler>();
+            await applyPresetCommand.HandleAsync(new(VillageId, SelectedPreset));
             await JobsModifiedCommand.Execute(new JobsModified(VillageId));
         }
 

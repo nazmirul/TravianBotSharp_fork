@@ -36,6 +36,10 @@ namespace WPFUI.Views.Tabs.Villages
                 this.BindCommand(ViewModel, vm => vm.ImportCommand, v => v.ImportButton).DisposeWith(d);
                 this.BindCommand(ViewModel, vm => vm.ExportCommand, v => v.ExportButton).DisposeWith(d);
 
+                this.OneWayBind(ViewModel, vm => vm.Presets, v => v.PresetSelector.ItemsSource).DisposeWith(d);
+                this.Bind(ViewModel, vm => vm.SelectedPreset, v => v.PresetSelector.SelectedItem).DisposeWith(d);
+                this.BindCommand(ViewModel, vm => vm.PresetCommand, v => v.PresetButton).DisposeWith(d);
+
                 this.BindCommand(ViewModel, vm => vm.UpCommand, v => v.UpButton).DisposeWith(d);
                 this.BindCommand(ViewModel, vm => vm.DownCommand, v => v.DownButton).DisposeWith(d);
                 this.BindCommand(ViewModel, vm => vm.TopCommand, v => v.TopButton).DisposeWith(d);

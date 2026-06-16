@@ -1,4 +1,5 @@
-﻿using MainCore.UI.Models.Input;
+﻿using MainCore.Commands.Misc;
+using MainCore.UI.Models.Input;
 
 namespace MainCore.Commands.UI.Villages.BuildViewModel
 {
@@ -10,6 +11,7 @@ namespace MainCore.Commands.UI.Villages.BuildViewModel
         private static async ValueTask<Result> HandleAsync(
             Command command,
             GetLayoutBuildingsCommand.Handler getLayoutBuildingsQuery,
+            ExpandPrerequisitesCommand.Handler expandPrerequisitesCommand,
             AddJobCommand.Handler addJobCommand
             )
         {
@@ -20,26 +22,14 @@ namespace MainCore.Commands.UI.Villages.BuildViewModel
 
             if (building is null)
             {
-                var result = plan.CheckRequirements(buildings);
-                if (result.IsFailed) return result;
                 plan.ValidateLocation(buildings);
             }
 
-            await addJobCommand.HandleAsync(new(villageId, plan.ToJob()));
-            return Result.Ok();
-        }
-
-        private static Result CheckRequirements(this NormalBuildPlan plan, List<BuildingItem> buildings)
-        {
-            var prerequisiteBuildings = plan.Type.GetPrerequisiteBuildings();
-            if (prerequisiteBuildings.Count == 0) return Result.Ok();
-            foreach (var prerequisiteBuilding in prerequisiteBuildings)
+            // Auto-insert any missing infrastructure prerequisites before the target, in order.
+            var plans = await expandPrerequisitesCommand.HandleAsync(new(villageId, plan));
+            foreach (var p in plans)
             {
-                var valid = buildings
-                    .Where(x => x.Type == prerequisiteBuilding.Type)
-                    .Any(x => x.Level >= prerequisiteBuilding.Level);
-
-                if (!valid) return Result.Fail($"Required {prerequisiteBuilding}");
+                await addJobCommand.HandleAsync(new(villageId, p.ToJob()));
             }
             return Result.Ok();
         }
