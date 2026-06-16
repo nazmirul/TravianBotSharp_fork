@@ -113,7 +113,8 @@ namespace MainCore.Services
                 };
                 if (!string.IsNullOrEmpty(setting.UserAgent)) args.Add($"--user-agent={setting.UserAgent}");
                 if (!string.IsNullOrEmpty(setting.ProxyHost)) args.Add($"--proxy-server={setting.ProxyHost}:{setting.ProxyPort}");
-                if (setting.IsHeadless) { args.Add("--headless=new"); args.Add("--disable-dev-shm-usage"); }
+                if (setting.IsHeadless) { args.Add("--headless=new"); args.Add("--disable-dev-shm-usage"); args.Add("--window-size=1280,1024"); }
+                else args.Add("--start-maximized");
 
                 Logger.Information("- Launching Chrome on debugging port {port} (profile: {profile})", port, pathUserData);
                 var psi = new ProcessStartInfo(chromeExe) { UseShellExecute = false };
@@ -137,6 +138,13 @@ namespace MainCore.Services
             _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
             _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
             _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3));
+
+            // Ensure a desktop-width viewport - a narrow window makes Travian switch to a responsive
+            // layout where the village sidebar DOM differs and switch/tab waits never resolve.
+            if (!setting.IsHeadless)
+            {
+                try { _driver.Manage().Window.Maximize(); } catch { /* best-effort */ }
+            }
 
             // BiDi over an attached session is best-effort; Navigate/Refresh fall back to classic WebDriver.
             try
