@@ -33,6 +33,16 @@
             result = await browser.Click(element, cancellationToken);
             if (result.IsFailed) return result;
 
+            // Click is human-like but can miss/get blocked (e.g. on a build page). Verify quickly,
+            // then self-heal with a direct URL navigation so we never hang on a stuck click.
+            var quick = await browser.WaitUrl($"dorf{dorf}.php", TimeSpan.FromSeconds(10), cancellationToken);
+            if (quick.IsFailed)
+            {
+                var root = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+                result = await browser.Navigate($"{root}/dorf{dorf}.php", cancellationToken);
+                if (result.IsFailed) return result;
+            }
+
             result = await browser.WaitPageChanged($"dorf{dorf}.php", cancellationToken);
             if (result.IsFailed) return result;
 

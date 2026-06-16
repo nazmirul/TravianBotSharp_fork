@@ -34,6 +34,8 @@ namespace MainCore.Services
 
         Task<Result> Wait(Predicate<IWebDriver> condition, CancellationToken cancellationToken, [CallerArgumentExpression("condition")] string? expression = null);
 
+        Task<Result> WaitUrl(string fragment, TimeSpan timeout, CancellationToken cancellationToken);
+
         Task<Result> WaitPageChanged(string url, CancellationToken cancellationToken);
     }
 }

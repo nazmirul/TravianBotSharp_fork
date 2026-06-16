@@ -107,7 +107,7 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <ComboBox x:Name="PresetSelector" Grid.Column="0" Margin="5" VerticalAlignment="Center" />
+                    <ComboBox x:Name="PresetSelector" Grid.Column="0" Margin="5" VerticalAlignment="Center" DisplayMemberPath="Name" />
                     <Button x:Name="PresetButton" Grid.Column="1" Content="Apply preset" Margin="5" />
                 </Grid>
                 <Grid>

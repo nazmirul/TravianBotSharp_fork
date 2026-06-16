@@ -71,7 +71,21 @@ namespace MainCore.Models.Presets
                 Entries = new()
                 {
                     PresetEntry.Build(BuildingEnums.MainBuilding, 20),
+                    PresetEntry.Build(BuildingEnums.Warehouse, 10),
+                    PresetEntry.Build(BuildingEnums.Granary, 10),
+                    PresetEntry.Fields(ResourcePlanEnums.AllResources, 6),
+                    PresetEntry.Build(BuildingEnums.Palace, 10),
+                    PresetEntry.Build(BuildingEnums.TownHall, 1),
                     PresetEntry.Fields(ResourcePlanEnums.AllResources, 10),
+                    PresetEntry.Build(BuildingEnums.Barracks, 10),
+                    PresetEntry.Build(BuildingEnums.Academy, 10),
+                    PresetEntry.Build(BuildingEnums.Smithy, 10),
+                    PresetEntry.Build(BuildingEnums.Stable, 10),
+                    PresetEntry.Build(BuildingEnums.GrainMill, 5),
+                    PresetEntry.Build(BuildingEnums.Sawmill, 5),
+                    PresetEntry.Build(BuildingEnums.Brickyard, 5),
+                    PresetEntry.Build(BuildingEnums.IronFoundry, 5),
+                    PresetEntry.Build(BuildingEnums.Bakery, 5),
                 },
             },
         };
