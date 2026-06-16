@@ -70,15 +70,18 @@ namespace MainCore.Models.Presets
                 Name = "Capital (15-cropper)",
                 Entries = new()
                 {
-                    // Main building only to 10 first - high MB levels cost more than low storage can hold.
-                    PresetEntry.Build(BuildingEnums.MainBuilding, 10),
+                    // Light storage first, then income, then bigger storage - so early builds always fit.
                     PresetEntry.Build(BuildingEnums.Warehouse, 5),
                     PresetEntry.Build(BuildingEnums.Granary, 5),
-                    PresetEntry.Fields(ResourcePlanEnums.AllResources, 6),
+                    PresetEntry.Fields(ResourcePlanEnums.AllResources, 7),
+                    PresetEntry.Build(BuildingEnums.Warehouse, 10),
+                    PresetEntry.Build(BuildingEnums.Granary, 10),
+                    // Then the rest. Main building only to 10 first (high MB levels need bigger storage).
+                    PresetEntry.Build(BuildingEnums.MainBuilding, 10),
                     PresetEntry.Build(BuildingEnums.Palace, 10),
                     PresetEntry.Build(BuildingEnums.TownHall, 1),
                     PresetEntry.Fields(ResourcePlanEnums.AllResources, 10),
-                    // Raise storage before pushing Main building to 20 (so the big upgrades fit).
+                    // Raise storage to max before pushing Main building to 20 (so the big upgrades fit).
                     PresetEntry.Build(BuildingEnums.Warehouse, 20),
                     PresetEntry.Build(BuildingEnums.Granary, 20),
                     PresetEntry.Build(BuildingEnums.MainBuilding, 20),
