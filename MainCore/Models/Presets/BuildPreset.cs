@@ -72,8 +72,8 @@ namespace MainCore.Models.Presets
                 {
                     // Main building only to 10 first - high MB levels cost more than low storage can hold.
                     PresetEntry.Build(BuildingEnums.MainBuilding, 10),
-                    PresetEntry.Build(BuildingEnums.Warehouse, 10),
-                    PresetEntry.Build(BuildingEnums.Granary, 10),
+                    PresetEntry.Build(BuildingEnums.Warehouse, 5),
+                    PresetEntry.Build(BuildingEnums.Granary, 5),
                     PresetEntry.Fields(ResourcePlanEnums.AllResources, 6),
                     PresetEntry.Build(BuildingEnums.Palace, 10),
                     PresetEntry.Build(BuildingEnums.TownHall, 1),
