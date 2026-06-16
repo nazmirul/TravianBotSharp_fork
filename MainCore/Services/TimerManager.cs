@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using MainCore.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Polly;
 using Polly.Retry;
 using Timer = System.Timers.Timer;
@@ -75,9 +76,17 @@ namespace MainCore.Services
             if (status != StatusEnums.Online) return;
             var tasks = taskQueue.Tasks;
             if (tasks.Count == 0) return;
-            var task = tasks[0];
 
-            if (task.ExecuteAt > DateTime.Now) return;
+            // Tasks are kept sorted by ExecuteAt, so the due ones are a prefix.
+            // Randomize which due task runs next so the action sequence (adventure,
+            // claim quest, NPC, build, ...) isn't a fixed pattern - harder to fingerprint.
+            // Login/Sleep stay prioritized: they gate everything else and must not be skipped.
+            var now = DateTime.Now;
+            var dueTasks = tasks.TakeWhile(x => x.ExecuteAt <= now).ToList();
+            if (dueTasks.Count == 0) return;
+
+            var task = dueTasks.FirstOrDefault(x => x is LoginTask.Task or SleepTask.Task)
+                ?? dueTasks[Random.Shared.Next(dueTasks.Count)];
 
             taskQueue.IsExecuting = true;
             var cts = new CancellationTokenSource();
