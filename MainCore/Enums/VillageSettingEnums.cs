@@ -7,7 +7,6 @@
 
         ApplyRomanQueueLogicWhenBuilding,
         UseSpecialUpgrade,
-        AutoBuildResourceWhenIdle,
 
         // Complete now
         CompleteImmediately,
@@ -62,5 +61,9 @@
         AutoClaimQuestEnable,
 
         CompleteImmediatelyTime,
+
+        // IMPORTANT: append new settings at the END only. These enum values are stored in the DB,
+        // so inserting in the middle shifts every later value and corrupts saved settings.
+        AutoBuildResourceWhenIdle,
     }
 }
