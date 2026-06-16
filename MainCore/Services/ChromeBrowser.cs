@@ -357,7 +357,24 @@ namespace MainCore.Services
         {
             if (Driver is null) return Stop.DriverNotReady;
 
-            await Task.Run(new Actions(Driver).Click(element).Perform);
+            void click()
+            {
+                // Click a random point inside the element (not the exact center) with a small
+                // cursor move + jittered pause, so the pointer trace looks human, not pixel-perfect.
+                var size = element.Size;
+                var maxX = Math.Max(1, (size.Width / 2) - 2);
+                var maxY = Math.Max(1, (size.Height / 2) - 2);
+                var offsetX = Random.Shared.Next(-maxX, maxX + 1);
+                var offsetY = Random.Shared.Next(-maxY, maxY + 1);
+
+                new Actions(Driver)
+                    .MoveToElement(element, offsetX, offsetY)
+                    .Pause(TimeSpan.FromMilliseconds(Random.Shared.Next(40, 140)))
+                    .Click()
+                    .Perform();
+            }
+
+            await Task.Run(click, cancellationToken);
             return Result.Ok();
         }
 
