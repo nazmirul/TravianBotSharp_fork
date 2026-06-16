@@ -110,6 +110,12 @@ namespace MainCore.Services
                     $"--user-data-dir={pathUserData}",
                     "--no-first-run",
                     "--no-default-browser-check",
+                    // Keep the page fully active when the window is minimized/occluded - otherwise Chrome
+                    // throttles timers/rendering and switch/tab waits time out (180s).
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-renderer-backgrounding",
+                    "--disable-features=CalculateNativeWinOcclusion",
                 };
                 if (!string.IsNullOrEmpty(setting.UserAgent)) args.Add($"--user-agent={setting.UserAgent}");
                 if (!string.IsNullOrEmpty(setting.ProxyHost)) args.Add($"--proxy-server={setting.ProxyHost}:{setting.ProxyPort}");
