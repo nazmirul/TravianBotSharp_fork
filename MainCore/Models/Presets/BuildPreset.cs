@@ -70,13 +70,18 @@ namespace MainCore.Models.Presets
                 Name = "Capital (15-cropper)",
                 Entries = new()
                 {
-                    PresetEntry.Build(BuildingEnums.MainBuilding, 20),
+                    // Main building only to 10 first - high MB levels cost more than low storage can hold.
+                    PresetEntry.Build(BuildingEnums.MainBuilding, 10),
                     PresetEntry.Build(BuildingEnums.Warehouse, 10),
                     PresetEntry.Build(BuildingEnums.Granary, 10),
                     PresetEntry.Fields(ResourcePlanEnums.AllResources, 6),
                     PresetEntry.Build(BuildingEnums.Palace, 10),
                     PresetEntry.Build(BuildingEnums.TownHall, 1),
                     PresetEntry.Fields(ResourcePlanEnums.AllResources, 10),
+                    // Raise storage before pushing Main building to 20 (so the big upgrades fit).
+                    PresetEntry.Build(BuildingEnums.Warehouse, 20),
+                    PresetEntry.Build(BuildingEnums.Granary, 20),
+                    PresetEntry.Build(BuildingEnums.MainBuilding, 20),
                     PresetEntry.Build(BuildingEnums.Barracks, 10),
                     PresetEntry.Build(BuildingEnums.Academy, 10),
                     PresetEntry.Build(BuildingEnums.Smithy, 10),
