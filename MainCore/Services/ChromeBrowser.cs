@@ -359,13 +359,14 @@ namespace MainCore.Services
 
             void click()
             {
-                // Click a random point inside the element (not the exact center) with a small
-                // cursor move + jittered pause, so the pointer trace looks human, not pixel-perfect.
+                // Click a slightly-off-center point with a small cursor move + jittered pause so the
+                // pointer trace looks human, not pixel-perfect. Jitter is kept within the central third
+                // of the element (offset is measured from its center) so small nav buttons never miss.
                 var size = element.Size;
-                var maxX = Math.Max(1, (size.Width / 2) - 2);
-                var maxY = Math.Max(1, (size.Height / 2) - 2);
-                var offsetX = Random.Shared.Next(-maxX, maxX + 1);
-                var offsetY = Random.Shared.Next(-maxY, maxY + 1);
+                var jitterX = Math.Min((size.Width / 2) - 1, size.Width / 6);
+                var jitterY = Math.Min((size.Height / 2) - 1, size.Height / 6);
+                var offsetX = jitterX > 0 ? Random.Shared.Next(-jitterX, jitterX + 1) : 0;
+                var offsetY = jitterY > 0 ? Random.Shared.Next(-jitterY, jitterY + 1) : 0;
 
                 new Actions(Driver)
                     .MoveToElement(element, offsetX, offsetY)
