@@ -25,6 +25,15 @@ namespace MainCore.Commands.Features.UseHeroItem
                 return InventoryParser.IsInventoryPage(doc);
             }
 
+            // Verify quickly; if the avatar click did not open the inventory, navigate there directly.
+            var quick = await browser.Wait(TabActived, TimeSpan.FromSeconds(10), cancellationToken);
+            if (quick.IsFailed)
+            {
+                var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+                result = await browser.Navigate($"{host}/hero/inventory", cancellationToken);
+                if (result.IsFailed) return result;
+            }
+
             result = await browser.Wait(TabActived, cancellationToken);
             if (result.IsFailed) return result;
 
