@@ -13,6 +13,10 @@
             )
         {
             var (villageId, plan) = command;
+
+            // Resource fields have no management sub-tabs - trying to switch one hangs on TabActived.
+            if (plan.Type.IsResourceField()) return Result.Ok();
+
             var building = context.Buildings
                 .Where(x => x.VillageId == villageId.Value)
                 .FirstOrDefault(x => x.Location == plan.Location);
