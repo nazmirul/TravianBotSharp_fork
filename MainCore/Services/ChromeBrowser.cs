@@ -17,6 +17,9 @@ namespace MainCore.Services
         private readonly ChromeDriverService _chromeService;
         private WebDriverWait _wait = null!;
 
+        // Cap waits so a stuck click/navigation fails fast (and Polly retries) instead of hanging 180s.
+        private static readonly TimeSpan WaitTimeout = TimeSpan.FromSeconds(40);
+
         private readonly string[] _extensionsPath;
         private readonly HtmlDocument _htmlDoc = new();
 
@@ -71,7 +74,7 @@ namespace MainCore.Services
             _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
 
             _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
-            _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3)); // watch ads
+            _wait = new WebDriverWait(_driver, WaitTimeout);
 
             _bidi = await _driver.AsBiDiAsync();
             _context = (await _bidi.BrowsingContext.GetTreeAsync()).Contexts[0].Context;
@@ -143,7 +146,7 @@ namespace MainCore.Services
 
             _driver = await Task.Run(() => new ChromeDriver(_chromeService, options, TimeSpan.FromMinutes(3)));
             _driver.Manage().Timeouts().PageLoad = TimeSpan.FromMinutes(3);
-            _wait = new WebDriverWait(_driver, TimeSpan.FromMinutes(3));
+            _wait = new WebDriverWait(_driver, WaitTimeout);
 
             // Ensure a desktop-width viewport - a narrow window makes Travian switch to a responsive
             // layout where the village sidebar DOM differs and switch/tab waits never resolve.

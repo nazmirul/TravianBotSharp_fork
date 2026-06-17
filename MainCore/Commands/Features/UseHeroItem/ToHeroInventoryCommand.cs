@@ -12,29 +12,20 @@ namespace MainCore.Commands.Features.UseHeroItem
             IChromeBrowser browser,
             CancellationToken cancellationToken)
         {
-            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetHeroAvatar(doc), cancellationToken);
-            if (isFailed) return Result.Fail(errors);
-
-            var result = await browser.Click(element, cancellationToken);
-            if (result.IsFailed) return result;
-
-            static bool TabActived(IWebDriver driver)
+            static bool InventoryReady(IWebDriver driver)
             {
                 var doc = new HtmlDocument();
                 doc.LoadHtml(driver.PageSource);
-                return InventoryParser.IsInventoryPage(doc);
+                return InventoryParser.IsInventoryPage(doc) || InventoryParser.IsInventoryLoaded(doc);
             }
 
-            // Verify quickly; if the avatar click did not open the inventory, navigate there directly.
-            var quick = await browser.Wait(TabActived, TimeSpan.FromSeconds(10), cancellationToken);
-            if (quick.IsFailed)
-            {
-                var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
-                result = await browser.Navigate($"{host}/hero/inventory", cancellationToken);
-                if (result.IsFailed) return result;
-            }
+            // Navigate straight to the hero inventory (account-wide) rather than clicking the avatar -
+            // the click sometimes does not register and the page never changes, hanging the wait.
+            var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+            var result = await browser.Navigate($"{host}/hero/inventory", cancellationToken);
+            if (result.IsFailed) return result;
 
-            result = await browser.Wait(TabActived, cancellationToken);
+            result = await browser.Wait(InventoryReady, cancellationToken);
             if (result.IsFailed) return result;
 
             return Result.Ok();
