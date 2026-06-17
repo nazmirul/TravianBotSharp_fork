@@ -16,7 +16,8 @@ namespace MainCore.UI.ViewModels.Tabs
         private static readonly ExpressionTemplate _template = new("{@t:HH:mm:ss} [{@l:u3}] {@m}\n{@x}");
 
         public ObservableCollection<TaskItem> Tasks { get; } = [];
-        private LinkedList<LogEvent> _logEvents = [];
+        private readonly LinkedList<LogEvent> _logEvents = [];
+        private readonly object _logLock = new();
 
         [Reactive]
         private string _logs = "";
@@ -96,7 +97,10 @@ namespace MainCore.UI.ViewModels.Tabs
             var (accountId, logEvent) = notification;
             if (accountId != AccountId) return false;
 
-            _logEvents.AddFirst(logEvent);
+            lock (_logLock)
+            {
+                _logEvents.AddFirst(logEvent);
+            }
             return true;
         }
 
@@ -131,11 +135,14 @@ namespace MainCore.UI.ViewModels.Tabs
         {
             var logs = _logSink.GetLogs(accountId);
             using var sw = new StringWriter(new StringBuilder());
-            _logEvents.Clear();
-            foreach (var log in logs)
+            lock (_logLock)
             {
-                _template.Format(log, sw);
-                _logEvents.AddFirst(log);
+                _logEvents.Clear();
+                foreach (var log in logs)
+                {
+                    _template.Format(log, sw);
+                    _logEvents.AddFirst(log);
+                }
             }
             return sw.ToString();
         }
@@ -144,7 +151,12 @@ namespace MainCore.UI.ViewModels.Tabs
         private string ReloadLog()
         {
             using var sw = new StringWriter(new StringBuilder());
-            foreach (var log in _logEvents)
+            LogEvent[] snapshot;
+            lock (_logLock)
+            {
+                snapshot = _logEvents.ToArray();
+            }
+            foreach (var log in snapshot)
             {
                 _template.Format(log, sw);
             }
