@@ -402,7 +402,19 @@ namespace MainCore.Services
                 element.Click();
             }
 
-            await Task.Run(click, cancellationToken);
+            try
+            {
+                await Task.Run(click, cancellationToken);
+            }
+            catch (StaleElementReferenceException)
+            {
+                // Page changed under us; let the caller re-find and retry without a noisy stack dump.
+                return Retry.Error.WithError("Element went stale during click");
+            }
+            catch (ElementClickInterceptedException)
+            {
+                return Retry.Error.WithError("Click intercepted");
+            }
             return Result.Ok();
         }
 
