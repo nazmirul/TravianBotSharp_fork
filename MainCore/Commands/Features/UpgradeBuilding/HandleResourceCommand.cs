@@ -41,11 +41,19 @@ namespace MainCore.Commands.Features.UpgradeBuilding
 
             var url = browser.CurrentUrl;
 
-            result = await useHeroResourceCommand.HandleAsync(new(accountId, missingResource), cancellationToken);
+            var heroResult = await useHeroResourceCommand.HandleAsync(new(accountId, missingResource), cancellationToken);
             await browser.Navigate(url, cancellationToken);
-            if (result.IsFailed) return result;
+            if (heroResult.IsFailed)
+            {
+                // Hero transfer flow can be flaky; don't loop/error on it. Fall through and let the
+                // build wait for resources to arrive naturally (handled below as MissingResource).
+                logger.Warning("Hero resource transfer did not complete; waiting for resources instead");
+            }
 
-            return Result.Ok();
+            // Re-check after the hero attempt. If still short, return the validation result (MissingResource)
+            // so the task schedules itself for when resources are ready instead of retrying immediately.
+            await updateStorageCommand.HandleAsync(new(accountId, villageId), cancellationToken);
+            return await validateEnoughResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
         }
 
         private static long[] GetRequiredResource(IChromeBrowser browser, BuildingEnums building)
