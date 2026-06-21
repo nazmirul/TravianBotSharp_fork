@@ -1,3 +1,6 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
 namespace MainCore.Models.Presets
 {
     /// <summary>
@@ -26,7 +29,42 @@ namespace MainCore.Models.Presets
 
     public static class BuildPresets
     {
-        public static readonly IReadOnlyList<BuildPreset> All = new List<BuildPreset>
+        // Loaded from presets.json next to the exe if present (edit there to reorder/add presets without
+        // recompiling); otherwise the built-in list is used and written to presets.json as a starting point.
+        private static IReadOnlyList<BuildPreset>? _cache;
+
+        public static IReadOnlyList<BuildPreset> All => _cache ??= Load();
+
+        private static readonly JsonSerializerOptions _json = new()
+        {
+            WriteIndented = true,
+            Converters = { new JsonStringEnumConverter() },
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        };
+
+        private static IReadOnlyList<BuildPreset> Load()
+        {
+            var path = Path.Combine(AppContext.BaseDirectory, "presets.json");
+            try
+            {
+                if (File.Exists(path))
+                {
+                    var loaded = JsonSerializer.Deserialize<List<BuildPreset>>(File.ReadAllText(path), _json);
+                    if (loaded is { Count: > 0 }) return loaded;
+                }
+                else
+                {
+                    File.WriteAllText(path, JsonSerializer.Serialize(BuiltIn, _json));
+                }
+            }
+            catch
+            {
+                // Malformed/locked file - fall back to built-in presets.
+            }
+            return BuiltIn;
+        }
+
+        private static readonly IReadOnlyList<BuildPreset> BuiltIn = new List<BuildPreset>
         {
             new()
             {
