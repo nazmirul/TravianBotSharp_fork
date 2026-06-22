@@ -55,30 +55,33 @@
             return null;
         }
 
-        public static HtmlNode? GetAmountBox(HtmlDocument doc)
+        // Newer "Transfer resources" dialog (hero -> active village): one dialog with named inputs
+        // (lumber/clay/iron/crop) plus a "Transfer" button. Replaces the old consumableHeroItem dialog.
+        public static bool IsResourceTransferDialog(HtmlDocument doc)
         {
-            var dialogHeroItemConsumable = doc.GetElementbyId("consumableHeroItem");
-            if (dialogHeroItemConsumable is null) return null;
-
-            var amountInput = dialogHeroItemConsumable
-                .Descendants("input")
-                .FirstOrDefault();
-            return amountInput;
+            return doc.DocumentNode
+                .Descendants("div")
+                .Any(x => x.HasClass("resourceTransferDialog"));
         }
 
-        public static HtmlNode? GetConfirmButton(HtmlDocument doc)
+        public static HtmlNode? GetResourceTransferInput(HtmlDocument doc, string name)
         {
-            var dialog = doc.GetElementbyId("dialogContent");
-            if (dialog is null) return null;
+            return doc.DocumentNode
+                .Descendants("input")
+                .FirstOrDefault(x => x.GetAttributeValue("name", "") == name);
+        }
 
-            var buttonWrapper = dialog
+        public static HtmlNode? GetTransferButton(HtmlDocument doc)
+        {
+            var actionButton = doc.DocumentNode
                 .Descendants("div")
-                .FirstOrDefault(x => x.HasClass("buttonsWrapper"));
-            if (buttonWrapper is null) return null;
+                .FirstOrDefault(x => x.HasClass("actionButton"));
+            if (actionButton is null) return null;
 
-            var buttonTransfer = buttonWrapper.Descendants("button");
-            if (buttonTransfer.Count() < 2) return null;
-            return buttonTransfer.ElementAt(1);
+            // Two buttons: "Transfer maximum" and "Transfer". We want the exact-amount "Transfer".
+            return actionButton
+                .Descendants("button")
+                .FirstOrDefault(x => x.InnerText.Trim() == "Transfer");
         }
     }
 }

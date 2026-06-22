@@ -19,7 +19,7 @@
             if (result.IsFailed) return result;
             await delayService.DelayClick(cancellationToken);
 
-            result = await EnterAmount(browser, amount, cancellationToken);
+            result = await EnterAmount(browser, item, amount, cancellationToken);
             if (result.IsFailed) return result;
             await delayService.DelayClick(cancellationToken);
 
@@ -29,6 +29,15 @@
 
             return Result.Ok();
         }
+
+        private static string? InputName(HeroItemEnums item) => item switch
+        {
+            HeroItemEnums.Wood => "lumber",
+            HeroItemEnums.Clay => "clay",
+            HeroItemEnums.Iron => "iron",
+            HeroItemEnums.Crop => "crop",
+            _ => null,
+        };
 
         private static async Task<Result> ClickItem(
             IChromeBrowser browser,
@@ -42,51 +51,54 @@
             result = await browser.Click(element, cancellationToken);
             if (result.IsFailed) return result;
 
-            static bool loadingCompleted(IWebDriver driver)
+            // Clicking a resource bag opens the "Transfer resources" dialog.
+            static bool dialogShown(IWebDriver driver)
             {
                 var doc = new HtmlDocument();
                 doc.LoadHtml(driver.PageSource);
-                return InventoryParser.IsInventoryLoaded(doc);
+                return InventoryParser.IsResourceTransferDialog(doc);
             }
 
-            result = await browser.Wait(driver => loadingCompleted(driver), cancellationToken);
+            result = await browser.Wait(dialogShown, cancellationToken);
             if (result.IsFailed) return result;
             return Result.Ok();
         }
 
         private static async Task<Result> EnterAmount(
             IChromeBrowser browser,
+            HeroItemEnums item,
             long amount,
             CancellationToken cancellationToken)
         {
-            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetAmountBox(doc), cancellationToken);
+            var name = InputName(item);
+            if (name is null) return Result.Ok();
+
+            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetResourceTransferInput(doc, name), cancellationToken);
             if (isFailed) return Result.Fail(errors);
 
-            Result result;
-            result = await browser.Input(element, amount.ToString(), cancellationToken);
-            if (result.IsFailed) return result;
-            return Result.Ok();
+            return await browser.Input(element, amount.ToString(), cancellationToken);
         }
 
         private static async Task<Result> Confirm(
             IChromeBrowser browser,
             CancellationToken cancellationToken)
         {
-            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetConfirmButton(doc), cancellationToken);
+            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetTransferButton(doc), cancellationToken);
             if (isFailed) return Result.Fail(errors);
-
-            static bool loadingCompleted(IWebDriver driver)
-            {
-                var doc = new HtmlDocument();
-                doc.LoadHtml(driver.PageSource);
-                return InventoryParser.IsInventoryLoaded(doc);
-            }
 
             Result result;
             result = await browser.Click(element, cancellationToken);
             if (result.IsFailed) return result;
 
-            result = await browser.Wait(driver => loadingCompleted(driver), cancellationToken);
+            // Dialog closes once the transfer completes.
+            static bool dialogClosed(IWebDriver driver)
+            {
+                var doc = new HtmlDocument();
+                doc.LoadHtml(driver.PageSource);
+                return !InventoryParser.IsResourceTransferDialog(doc);
+            }
+
+            result = await browser.Wait(dialogClosed, cancellationToken);
             if (result.IsFailed) return result;
 
             return Result.Ok();
