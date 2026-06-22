@@ -1,11 +1,18 @@
 ﻿using MainCore.Commands.Features.UpgradeBuilding;
+using MainCore.Commands.Misc;
 using MainCore.Tasks.Base;
+using System.Collections.Concurrent;
 
 namespace MainCore.Tasks
 {
     [Handler]
     public static partial class UpgradeBuildingTask
     {
+        // Tracks consecutive hard-failures per build target so a job that keeps failing (e.g. a build
+        // page whose upgrade never registers) gets pushed to the bottom instead of blocking the queue.
+        private static readonly ConcurrentDictionary<string, int> _planFails = new();
+        private const int FailThreshold = 3;
+
         public sealed class Task : VillageTask
         {
             public Task(AccountId accountId, VillageId villageId) : base(accountId, villageId)
@@ -25,6 +32,7 @@ namespace MainCore.Tasks
             AddCroplandCommand.Handler addCroplandCommand,
             HandleUpgradeCommand.Handler handleUpgradeCommand,
             UpdateBuildingCommand.Handler updateBuildingCommand,
+            DeprioritizeBuildJobCommand.Handler deprioritizeBuildJobCommand,
             CancellationToken cancellationToken)
         {
             Result result;
@@ -47,8 +55,21 @@ namespace MainCore.Tasks
 
                 logger.Information("Build {Type} to level {Level} at location {Location}", plan.Type, plan.Level, plan.Location);
 
+                var failKey = $"{task.VillageId.Value}-{plan.Location}-{plan.Type}";
+
+                async ValueTask<Result> onBuildFailed(Result failed)
+                {
+                    var fails = _planFails.AddOrUpdate(failKey, 1, (_, v) => v + 1);
+                    if (fails < FailThreshold) return failed;
+
+                    _planFails.TryRemove(failKey, out _);
+                    logger.Warning("Build {Type} at location {Location} failed {Fails} times - moving it to the bottom of the queue", plan.Type, plan.Location, fails);
+                    await deprioritizeBuildJobCommand.HandleAsync(new(task.VillageId, plan.Location, plan.Type), cancellationToken);
+                    return Skip.Error.WithErrors(failed.Errors);
+                }
+
                 result = await toBuildPageCommand.HandleAsync(new(task.VillageId, plan), cancellationToken);
-                if (result.IsFailed) return result;
+                if (result.IsFailed) return await onBuildFailed(result);
 
                 result = await handleResourceCommand.HandleAsync(new(task.AccountId, task.VillageId, plan), cancellationToken);
                 if (result.IsFailed)
@@ -74,8 +95,9 @@ namespace MainCore.Tasks
                 }
 
                 result = await handleUpgradeCommand.HandleAsync(new(task.VillageId, plan), cancellationToken);
-                if (result.IsFailed) return result;
+                if (result.IsFailed) return await onBuildFailed(result);
 
+                _planFails.TryRemove(failKey, out _);
                 logger.Information("Upgrade for {Type} at location {Location} completed successfully.", plan.Type, plan.Location);
 
                 result = await updateBuildingCommand.HandleAsync(new(task.VillageId), cancellationToken);
