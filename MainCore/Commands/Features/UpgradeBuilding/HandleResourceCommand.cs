@@ -1,4 +1,5 @@
-﻿using MainCore.Commands.Features.UseHeroItem;
+﻿using MainCore.Commands.Features.NpcResource;
+using MainCore.Commands.Features.UseHeroItem;
 
 namespace MainCore.Commands.Features.UpgradeBuilding
 {
@@ -16,6 +17,8 @@ namespace MainCore.Commands.Features.UpgradeBuilding
             UseHeroResourceCommand.Handler useHeroResourceCommand,
             ValidateEnoughResourceCommand.Handler validateEnoughResourceCommand,
             GetMissingResourceCommand.Handler getMissingResourceCommand,
+            ToNpcResourcePageCommand.Handler toNpcResourcePageCommand,
+            NpcResourceCommand.Handler npcResourceCommand,
             ISettingService settingService,
             IChromeBrowser browser,
             ILogger logger,
@@ -33,27 +36,40 @@ namespace MainCore.Commands.Features.UpgradeBuilding
             if (result.HasError<LackOfFreeCrop>()) return result;
             if (result.HasError<StorageLimit>()) return result;
 
-            var useHeroResource = settingService.BooleanByName(villageId, VillageSettingEnums.UseHeroResourceForBuilding);
-            if (!useHeroResource) return result;
-
-            logger.Information("Don't have enough resource. Use resource in hero invetory to upgrade building");
-            var missingResource = await getMissingResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
-
             var url = browser.CurrentUrl;
 
-            var heroResult = await useHeroResourceCommand.HandleAsync(new(accountId, missingResource), cancellationToken);
-            await browser.Navigate(url, cancellationToken);
-            if (heroResult.IsFailed)
+            // 1) Top up from hero inventory if enabled.
+            if (settingService.BooleanByName(villageId, VillageSettingEnums.UseHeroResourceForBuilding))
             {
-                // Hero transfer flow can be flaky; don't loop/error on it. Fall through and let the
-                // build wait for resources to arrive naturally (handled below as MissingResource).
-                logger.Warning("Hero resource transfer did not complete; waiting for resources instead");
+                logger.Information("Don't have enough resource. Use resource in hero inventory to upgrade building");
+                var missingResource = await getMissingResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
+
+                var heroResult = await useHeroResourceCommand.HandleAsync(new(accountId, missingResource), cancellationToken);
+                await browser.Navigate(url, cancellationToken);
+                if (heroResult.IsFailed) logger.Warning("Hero resource transfer did not complete");
+
+                await updateStorageCommand.HandleAsync(new(accountId, villageId), cancellationToken);
+                result = await validateEnoughResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
+                if (!result.IsFailed) return Result.Ok();
             }
 
-            // Re-check after the hero attempt. If still short, return the validation result (MissingResource)
-            // so the task schedules itself for when resources are ready instead of retrying immediately.
-            await updateStorageCommand.HandleAsync(new(accountId, villageId), cancellationToken);
-            return await validateEnoughResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
+            // 2) Still short -> NPC exchange (convert surplus to the needed resources) if enabled.
+            if (settingService.BooleanByName(villageId, VillageSettingEnums.AutoNPCEnable))
+            {
+                var npcPage = await toNpcResourcePageCommand.HandleAsync(new(villageId), cancellationToken);
+                if (npcPage.IsSuccess)
+                {
+                    logger.Information("Don't have enough resource. NPC exchange to cover build cost");
+                    await npcResourceCommand.HandleAsync(new(villageId), cancellationToken);
+                    await browser.Navigate(url, cancellationToken);
+                    await updateStorageCommand.HandleAsync(new(accountId, villageId), cancellationToken);
+                    result = await validateEnoughResourceCommand.HandleAsync(new(villageId, requiredResource), cancellationToken);
+                    if (!result.IsFailed) return Result.Ok();
+                }
+            }
+
+            // Still short after hero/NPC: return MissingResource so the task waits for natural resources.
+            return result;
         }
 
         private static long[] GetRequiredResource(IChromeBrowser browser, BuildingEnums building)

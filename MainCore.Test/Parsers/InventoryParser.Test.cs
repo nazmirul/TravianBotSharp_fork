@@ -49,18 +49,29 @@ namespace MainCore.Test.Parsers
         }
 
         [Fact]
-        public void GetAmountBox()
+        public void IsResourceTransferDialog()
         {
             _html.Load(AmountDialog);
-            var actual = MainCore.Parsers.InventoryParser.GetAmountBox(_html);
+            var actual = MainCore.Parsers.InventoryParser.IsResourceTransferDialog(_html);
+            actual.ShouldBeTrue();
+        }
+
+        [Theory]
+        [InlineData("lumber")]
+        [InlineData("clay")]
+        [InlineData("iron")]
+        public void GetResourceTransferInput(string name)
+        {
+            _html.Load(AmountDialog);
+            var actual = MainCore.Parsers.InventoryParser.GetResourceTransferInput(_html, name);
             actual.ShouldNotBeNull();
         }
 
         [Fact]
-        public void GetConfirmButton()
+        public void GetTransferButton()
         {
             _html.Load(AmountDialog);
-            var actual = MainCore.Parsers.InventoryParser.GetConfirmButton(_html);
+            var actual = MainCore.Parsers.InventoryParser.GetTransferButton(_html);
             actual.ShouldNotBeNull();
         }
     }
