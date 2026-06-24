@@ -12,32 +12,19 @@
             IDelayService delayService,
             CancellationToken cancellationToken)
         {
-            var (item, amount) = command;
-            logger.Information("Use {Amount} {Item} from hero inventory", amount, item);
+            var (item, _) = command;
+            logger.Information("Transfer max {Item} from hero inventory", item);
 
             var result = await ClickItem(browser, item, cancellationToken);
             if (result.IsFailed) return result;
             await delayService.DelayClick(cancellationToken);
 
-            result = await EnterAmount(browser, item, amount, cancellationToken);
-            if (result.IsFailed) return result;
-            await delayService.DelayClick(cancellationToken);
-
-            result = await Confirm(browser, cancellationToken);
+            result = await ConfirmMax(browser, cancellationToken);
             if (result.IsFailed) return result;
             await delayService.DelayClick(cancellationToken);
 
             return Result.Ok();
         }
-
-        private static string? InputName(HeroItemEnums item) => item switch
-        {
-            HeroItemEnums.Wood => "lumber",
-            HeroItemEnums.Clay => "clay",
-            HeroItemEnums.Iron => "iron",
-            HeroItemEnums.Crop => "crop",
-            _ => null,
-        };
 
         private static async Task<Result> ClickItem(
             IChromeBrowser browser,
@@ -64,26 +51,11 @@
             return Result.Ok();
         }
 
-        private static async Task<Result> EnterAmount(
-            IChromeBrowser browser,
-            HeroItemEnums item,
-            long amount,
-            CancellationToken cancellationToken)
-        {
-            var name = InputName(item);
-            if (name is null) return Result.Ok();
-
-            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetResourceTransferInput(doc, name), cancellationToken);
-            if (isFailed) return Result.Fail(errors);
-
-            return await browser.Input(element, amount.ToString(), cancellationToken);
-        }
-
-        private static async Task<Result> Confirm(
+        private static async Task<Result> ConfirmMax(
             IChromeBrowser browser,
             CancellationToken cancellationToken)
         {
-            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetTransferButton(doc), cancellationToken);
+            var (_, isFailed, element, errors) = await browser.GetElement(doc => InventoryParser.GetTransferMaxButton(doc), cancellationToken);
             if (isFailed) return Result.Fail(errors);
 
             Result result;

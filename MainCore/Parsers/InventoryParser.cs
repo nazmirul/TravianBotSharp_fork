@@ -83,5 +83,20 @@
                 .Descendants("button")
                 .FirstOrDefault(x => x.InnerText.Trim() == "Transfer");
         }
+
+        // "Transfer maximum" - always enabled (unlike "Transfer", which needs a manually-entered
+        // amount and is disabled until the input is touched). Simpler/more reliable than driving the
+        // per-resource amount inputs.
+        public static HtmlNode? GetTransferMaxButton(HtmlDocument doc)
+        {
+            var actionButton = doc.DocumentNode
+                .Descendants("div")
+                .FirstOrDefault(x => x.HasClass("actionButton"));
+            if (actionButton is null) return null;
+
+            return actionButton
+                .Descendants("button")
+                .FirstOrDefault(x => x.InnerText.Trim() == "Transfer maximum");
+        }
     }
 }

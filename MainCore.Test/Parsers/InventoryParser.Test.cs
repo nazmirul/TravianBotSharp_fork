@@ -68,6 +68,14 @@ namespace MainCore.Test.Parsers
         }
 
         [Fact]
+        public void GetTransferMaxButton()
+        {
+            _html.Load(AmountDialog);
+            var actual = MainCore.Parsers.InventoryParser.GetTransferMaxButton(_html);
+            actual.ShouldNotBeNull();
+        }
+
+        [Fact]
         public void GetTransferButton()
         {
             _html.Load(AmountDialog);
