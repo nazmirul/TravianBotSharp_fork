@@ -120,7 +120,11 @@ namespace MainCore.Services
                     "--disable-renderer-backgrounding",
                     "--disable-features=CalculateNativeWinOcclusion",
                 };
-                if (!string.IsNullOrEmpty(setting.UserAgent)) args.Add($"--user-agent={setting.UserAgent}");
+                // Deliberately NOT overriding --user-agent here: this is a real Chrome instance, so its
+                // own UA already matches its real platform/viewport/touch capabilities exactly. Forcing
+                // a random UA from the rotation list (which can be a mobile string) onto a real desktop
+                // Chrome creates a UA/platform mismatch - a much stronger bot-detection signal than just
+                // using whatever desktop UA Chrome reports natively.
                 if (!string.IsNullOrEmpty(setting.ProxyHost)) args.Add($"--proxy-server={setting.ProxyHost}:{setting.ProxyPort}");
                 if (setting.IsHeadless) { args.Add("--headless=new"); args.Add("--disable-dev-shm-usage"); args.Add("--window-size=1280,1024"); }
                 else args.Add("--start-maximized");
