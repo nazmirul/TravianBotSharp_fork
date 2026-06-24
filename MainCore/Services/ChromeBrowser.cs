@@ -413,9 +413,25 @@ namespace MainCore.Services
             }
             catch (ElementClickInterceptedException)
             {
+                // Usually a stray dialog overlay (e.g. hero transfer popup) still covering the page.
+                // Dismiss it so the retried click isn't blocked again.
+                TryDismissOverlay();
                 return Retry.Error.WithError("Click intercepted");
             }
             return Result.Ok();
+        }
+
+        private void TryDismissOverlay()
+        {
+            try
+            {
+                _driver?.FindElements(By.CssSelector(".dialogCancelButton, .dialogOverlay"))
+                    .FirstOrDefault()?.Click();
+            }
+            catch
+            {
+                // Best-effort; if there's nothing to dismiss or it also fails, the caller will retry.
+            }
         }
 
         public async Task<Result> Input(IWebElement element, string content, CancellationToken cancellationToken)
