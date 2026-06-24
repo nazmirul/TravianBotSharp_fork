@@ -67,16 +67,16 @@ namespace MainCore.Tasks
                     logger.Warning("Build {Type} at location {Location} failed {Fails} times - moving it to the bottom of the queue", plan.Type, plan.Location, fails);
                     await deprioritizeBuildJobCommand.HandleAsync(new(task.VillageId, plan.Location, plan.Type), cancellationToken);
 
-                    if (plan.Type.IsResourceField())
+                    if (plan.Type.IsResourceField() && LooksPermanentlyCapped(browser, plan))
                     {
-                        // A resource field that repeatedly has no upgrade button/cost is almost always
-                        // at this village's actual cap (e.g. non-capital fields cap below the capital
-                        // max) - blacklist it so ResourceBuild stops re-minting the same dead job, and
-                        // back out to the village overview so the browser isn't left on a dead-end page.
+                        // No cost panel AND no upgrade/construct button on the actual page - this is the
+                        // real "village can't upgrade this field further" signal (e.g. non-capital field
+                        // cap), not just a missed click. Blacklist so ResourceBuild stops re-minting the
+                        // same dead job, and back out to the overview so the browser isn't left stranded.
                         logger.Warning("{Type} at location {Location} looks capped for this village - excluding it from auto resource-build for a while", plan.Type, plan.Location);
                         GetBuildPlanCommand.MarkFieldCapped(task.VillageId, plan.Location);
-                        await toDorfCommand.HandleAsync(new(0), CancellationToken.None);
                     }
+                    await toDorfCommand.HandleAsync(new(0), CancellationToken.None);
 
                     return Skip.Error.WithErrors(failed.Errors);
                 }
@@ -116,6 +116,20 @@ namespace MainCore.Tasks
                 result = await updateBuildingCommand.HandleAsync(new(task.VillageId), cancellationToken);
                 if (result.IsFailed) return result;
             }
+        }
+
+        // True only when the build page shows neither a cost panel nor an upgrade/construct button -
+        // the real in-game "nothing more to do here" state. A field with a visible cost that merely
+        // failed to click (page didn't navigate) must NOT be blacklisted - that's a transient UI miss.
+        private static bool LooksPermanentlyCapped(IChromeBrowser browser, NormalBuildPlan plan)
+        {
+            var doc = browser.Html;
+            var hasCost = UpgradeParser.GetRequiredResource(doc, plan.Type).Count > 0;
+            if (hasCost) return false;
+
+            var hasButton = UpgradeParser.GetUpgradeButton(doc) is not null
+                || UpgradeParser.GetConstructButton(doc, plan.Type) is not null;
+            return !hasButton;
         }
     }
 }

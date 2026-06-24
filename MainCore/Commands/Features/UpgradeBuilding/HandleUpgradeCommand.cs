@@ -49,13 +49,13 @@
                 }
                 else
                 {
-                    result = await browser.Upgrade(cancellationToken);
+                    result = await browser.Upgrade(plan.Location, cancellationToken);
                     if (result.IsFailed) return result;
                 }
             }
             else
             {
-                result = await browser.Construct(plan.Type, cancellationToken);
+                result = await browser.Construct(plan.Type, plan.Location, cancellationToken);
                 if (result.IsFailed) return result;
             }
 
@@ -226,6 +226,7 @@
 
         private static async Task<Result> Upgrade(
             this IChromeBrowser browser,
+            int location,
             CancellationToken cancellationToken)
         {
             var (_, isFailed, element, errors) = await browser.GetElement(doc => UpgradeParser.GetUpgradeButton(doc), cancellationToken);
@@ -234,15 +235,13 @@
             var result = await browser.Click(element, cancellationToken);
             if (result.IsFailed) return result;
 
-            result = await browser.WaitPageChanged("dorf", cancellationToken);
-            if (result.IsFailed) return result;
-
-            return Result.Ok();
+            return await browser.ConfirmPageLeftBuildPage(location, cancellationToken);
         }
 
         private static async Task<Result> Construct(
             this IChromeBrowser browser,
             BuildingEnums building,
+            int location,
             CancellationToken cancellationToken
         )
         {
@@ -252,9 +251,27 @@
             var result = await browser.Click(element, cancellationToken);
             if (result.IsFailed) return result;
 
-            result = await browser.WaitPageChanged("dorf", cancellationToken);
-            if (result.IsFailed) return result;
-            return Result.Ok();
+            return await browser.ConfirmPageLeftBuildPage(location, cancellationToken);
+        }
+
+        // Click the upgrade/construct button can silently miss (Travian's JS handler not triggered).
+        // Verify quickly, then self-heal with a direct dorf navigation so we never hang 40s on a dead
+        // click - matches the same pattern already used for dorf/tab/building-by-location navigation.
+        private static async Task<Result> ConfirmPageLeftBuildPage(
+            this IChromeBrowser browser,
+            int location,
+            CancellationToken cancellationToken)
+        {
+            var quick = await browser.WaitUrl("dorf", TimeSpan.FromSeconds(10), cancellationToken);
+            if (quick.IsFailed)
+            {
+                var dorf = location < 19 ? 1 : 2;
+                var host = new Uri(browser.CurrentUrl).GetLeftPart(UriPartial.Authority);
+                var result = await browser.Navigate($"{host}/dorf{dorf}.php", cancellationToken);
+                if (result.IsFailed) return result;
+            }
+
+            return await browser.WaitPageChanged("dorf", cancellationToken);
         }
     }
 }
