@@ -33,6 +33,7 @@ namespace MainCore.Tasks
             HandleUpgradeCommand.Handler handleUpgradeCommand,
             UpdateBuildingCommand.Handler updateBuildingCommand,
             DeprioritizeBuildJobCommand.Handler deprioritizeBuildJobCommand,
+            MainCore.Commands.Navigate.ToDorfCommand.Handler toDorfCommand,
             CancellationToken cancellationToken)
         {
             Result result;
@@ -65,6 +66,18 @@ namespace MainCore.Tasks
                     _planFails.TryRemove(failKey, out _);
                     logger.Warning("Build {Type} at location {Location} failed {Fails} times - moving it to the bottom of the queue", plan.Type, plan.Location, fails);
                     await deprioritizeBuildJobCommand.HandleAsync(new(task.VillageId, plan.Location, plan.Type), cancellationToken);
+
+                    if (plan.Type.IsResourceField())
+                    {
+                        // A resource field that repeatedly has no upgrade button/cost is almost always
+                        // at this village's actual cap (e.g. non-capital fields cap below the capital
+                        // max) - blacklist it so ResourceBuild stops re-minting the same dead job, and
+                        // back out to the village overview so the browser isn't left on a dead-end page.
+                        logger.Warning("{Type} at location {Location} looks capped for this village - excluding it from auto resource-build for a while", plan.Type, plan.Location);
+                        GetBuildPlanCommand.MarkFieldCapped(task.VillageId, plan.Location);
+                        await toDorfCommand.HandleAsync(new(0), CancellationToken.None);
+                    }
+
                     return Skip.Error.WithErrors(failed.Errors);
                 }
 

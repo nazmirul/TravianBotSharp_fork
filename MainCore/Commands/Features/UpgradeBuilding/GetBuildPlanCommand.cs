@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Collections.Concurrent;
+using System.Text.Json;
 
 namespace MainCore.Commands.Features.UpgradeBuilding
 {
@@ -6,6 +7,28 @@ namespace MainCore.Commands.Features.UpgradeBuilding
     public static partial class GetBuildPlanCommand
     {
         public sealed record Command(AccountId AccountId, VillageId VillageId) : IAccountVillageCommand;
+
+        // Fields the game refuses to upgrade further in this village (e.g. non-capital resource-field
+        // cap) are blacklisted so a ResourceBuild plan stops re-minting the same impossible job forever.
+        // TTL lets it retry occasionally in case the cap changes (village becomes capital, etc).
+        private static readonly ConcurrentDictionary<string, DateTime> _cappedFields = new();
+        private static readonly TimeSpan CapRetryAfter = TimeSpan.FromHours(6);
+
+        public static void MarkFieldCapped(VillageId villageId, int location)
+        {
+            _cappedFields[$"{villageId.Value}-{location}"] = DateTime.UtcNow + CapRetryAfter;
+        }
+
+        private static bool IsFieldCapped(VillageId villageId, int location)
+        {
+            if (!_cappedFields.TryGetValue($"{villageId.Value}-{location}", out var until)) return false;
+            if (DateTime.UtcNow >= until)
+            {
+                _cappedFields.TryRemove($"{villageId.Value}-{location}", out _);
+                return false;
+            }
+            return true;
+        }
 
         private static async ValueTask<Result<NormalBuildPlan>> HandleAsync(
             Command command,
@@ -42,7 +65,7 @@ namespace MainCore.Commands.Features.UpgradeBuilding
 
                     var layoutBuildings = await getLayoutBuildingsQuery.HandleAsync(new(villageId, true));
                     var resourceBuildPlan = JsonSerializer.Deserialize<ResourceBuildPlan>(job.Content)!;
-                    var normalBuildPlan = GetNormalBuildPlan(resourceBuildPlan, layoutBuildings);
+                    var normalBuildPlan = GetNormalBuildPlan(villageId, resourceBuildPlan, layoutBuildings);
                     if (normalBuildPlan is null)
                     {
                         await deleteJobByIdCommand.HandleAsync(new(job.Id), cancellationToken);
@@ -76,6 +99,7 @@ namespace MainCore.Commands.Features.UpgradeBuilding
         }
 
         private static NormalBuildPlan? GetNormalBuildPlan(
+            VillageId villageId,
             ResourceBuildPlan plan,
             List<BuildingItem> layoutBuildings
         )
@@ -103,6 +127,8 @@ namespace MainCore.Commands.Features.UpgradeBuilding
                     .Where(x => x.Level < plan.Level)
                     .ToList();
             }
+
+            resourceFields = resourceFields.Where(x => !IsFieldCapped(villageId, x.Location)).ToList();
 
             if (resourceFields.Count == 0) return null;
 
