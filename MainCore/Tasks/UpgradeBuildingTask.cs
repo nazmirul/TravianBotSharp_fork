@@ -95,7 +95,15 @@ namespace MainCore.Tasks
 
                     if (result.HasError<StorageLimit>())
                     {
-                        return Stop.Error.WithErrors(result.Errors);
+                        // Warehouse/granary too small to ever hold the build's full cost - this exact
+                        // job can never be afforded until storage is raised elsewhere in the queue.
+                        // Don't pause the whole account: push it to the bottom so other jobs proceed,
+                        // back out to the overview, and retry this one later.
+                        logger.Warning("Build {Type} at location {Location} needs more storage than the village has - moving it to the bottom of the queue", plan.Type, plan.Location);
+                        await deprioritizeBuildJobCommand.HandleAsync(new(task.VillageId, plan.Location, plan.Type), cancellationToken);
+                        await toDorfCommand.HandleAsync(new(0), CancellationToken.None);
+                        task.ExecuteAt = DateTime.Now.AddHours(1);
+                        return Skip.Error.WithErrors(result.Errors);
                     }
                     if (result.HasError<MissingResource>())
                     {
